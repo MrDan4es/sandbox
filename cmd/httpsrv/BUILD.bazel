@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "httpsrv_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/mrdan4es/sandbox/cmd/httpsrv",
+    visibility = ["//visibility:private"],
+    deps = ["//internal/http/server"],
+)
+
+go_binary(
+    name = "httpsrv",
+    embed = [":httpsrv_lib"],
+    visibility = ["//visibility:public"],
+)

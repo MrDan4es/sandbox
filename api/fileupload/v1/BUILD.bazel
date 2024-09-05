@@ -1,0 +1,16 @@
+load("@rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+proto_library(
+    name = "fileuploadpb_proto",
+    srcs = ["fileupload_service.proto"],
+    visibility = ["//visibility:public"],
+)
+
+go_proto_library(
+    name = "fileuploadpb_go_proto",
+    compilers = ["@rules_go//proto:go_grpc"],
+    importpath = "github.com/mrdan4es/sandbox/api/fileuploadpb/v1",
+    proto = ":fileuploadpb_proto",
+    visibility = ["//visibility:public"],
+)

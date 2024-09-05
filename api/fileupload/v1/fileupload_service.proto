@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package api.fileupload.v1;
+
+option go_package = "github.com/mrdan4es/sandbox/api/fileuploadpb/v1;fileuploadpb";
+
+service FileUploadService {
+
+}

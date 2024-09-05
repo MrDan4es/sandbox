@@ -1,0 +1,9 @@
+load("@gazelle//:def.bzl", "gazelle")
+
+# gazelle:prefix github.com/mrdan4es/sandbox
+# gazelle:go_proto_compilers @rules_go//proto:go_proto
+# gazelle:go_grpc_compilers @rules_go//proto:go_grpc
+# gazelle:exclude **/empty.go
+# gazelle:proto package
+# gazelle:proto_group go_package
+gazelle(name = "gazelle")
