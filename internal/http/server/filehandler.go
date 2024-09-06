@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -8,124 +9,151 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	pb "github.com/mrdan4es/sandbox/api/fileuploadpb/v1"
 )
 
-func FirmwareUploadHandler(w http.ResponseWriter, r *http.Request) {
-	if err := uploadHandler(w, r); err != nil {
-		slog.Error(err.Error())
+func FileUploadHandler(c pb.FileUploadServiceClient) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const bufferSize = 3 << 20
+
+		slog.Info("starting to download the file", "buffer", bufferSize)
+
+		start := time.Now()
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<30)
+
+		err := r.ParseMultipartForm(32 * 1024)
+		if err != nil {
+			http.Error(w, "Ошибка при парсинге формы", http.StatusBadRequest)
+			slog.Error("parse multipart form", "error", err)
+			return
+		}
+
+		// Получаем файл из формы
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Ошибка при получении файла", http.StatusInternalServerError)
+			slog.Error("form file", "error", err)
+			return
+		}
+		defer file.Close()
+
+		stream, err := c.UploadUpdateFile(context.Background())
+		if err != nil {
+			http.Error(w, "Ошибка при открытии стрима", http.StatusInternalServerError)
+			slog.Error("stream open file", "error", err)
+			return
+		}
+
+		if err := stream.Send(&pb.UploadUpdateFileRequest{
+			Data: &pb.UploadUpdateFileRequest_FileName{FileName: header.Filename},
+		}); err != nil {
+			http.Error(w, "Ошибка при отправки названия файла", http.StatusInternalServerError)
+			slog.Error("stream send file", "error", err)
+			return
+		}
+
+		buffer := make([]byte, bufferSize)
+		for {
+			n, err := file.Read(buffer)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				http.Error(w, "Ошибка при чтении файла", http.StatusInternalServerError)
+				slog.Error("read file", "error", err)
+				return
+			}
+
+			if sendErr := stream.Send(
+				&pb.UploadUpdateFileRequest{
+					Data: &pb.UploadUpdateFileRequest_ChunkData{ChunkData: buffer[:n]},
+				},
+			); sendErr != nil {
+				http.Error(w, "Ошибка при записи файла", http.StatusInternalServerError)
+				slog.Error("write file", "error", sendErr)
+				return
+			}
+			slog.Info("send chunk", "size", len(buffer[:n]))
+		}
+
+		fmt.Fprintf(w, "Файл %s успешно загружен", header.Filename)
+		slog.Info("file downloaded successfully", "time", time.Since(start))
+
+		if _, err := stream.CloseAndRecv(); err != nil {
+			slog.Error("close stream", "error", err)
+		}
 	}
-	return
-	//if err == nil {
-	//	return
-	//}
-	//
-	//errStatus := status.Convert(err)
-	//errMessage, err := protojson.Marshal(errStatus.Proto())
-	//if err != nil {
-	//	http.Error(w, "failed to marshal error message to JSON", http.StatusInternalServerError)
-	//	return
-	//}
-	//
-	//w.Header().Set("Content-Type", "application/json")
-	//http.Error(w, string(errMessage), http.StatusPreconditionFailed)
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) error {
-	slog.Info("starting uploaded")
-	start := time.Now()
+func FileUploadHandler2(c pb.FileUploadServiceClient) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		const bufferSize = 4 << 20
 
-	const (
-		maxMemory  = 10 << 30
-		bufferSize = 1 << 20
-	)
+		slog.Info("starting to download the file", "buffer", bufferSize)
 
-	err := r.ParseMultipartForm(maxMemory)
+		start := time.Now()
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<30)
 
-	if err != nil {
-		http.Error(w, "failed to parse multipart form", http.StatusInternalServerError)
-		return err
-	}
-
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "Не удалось получить файл", http.StatusBadRequest)
-		return err
-	}
-	defer file.Close()
-
-	dst, err := os.Create(filepath.Join("/home/mrdan4es/git/bazel/sandbox/test", header.Filename))
-	if err != nil {
-		http.Error(w, "Не удалось создать файл", http.StatusInternalServerError)
-		return err
-	}
-	defer dst.Close()
-
-	buf := make([]byte, bufferSize)
-	for {
-		n, err := file.Read(buf)
-		if err != nil && err != io.EOF {
-			http.Error(w, "Ошибка чтения файла", http.StatusInternalServerError)
-			return err
-		}
-		if n == 0 {
-			break
+		err := r.ParseMultipartForm(32 * 1024)
+		if err != nil {
+			http.Error(w, "Ошибка при парсинге формы", http.StatusBadRequest)
+			slog.Error("parse multipart form", "error", err)
+			return
 		}
 
-		if _, err := dst.Write(buf[:n]); err != nil {
-			http.Error(w, "Ошибка записи файла", http.StatusInternalServerError)
-			return err
+		// Получаем файл из формы
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "Ошибка при получении файла", http.StatusInternalServerError)
+			slog.Error("form file", "error", err)
+			return
 		}
+		defer file.Close()
+
+		stream, err := c.UploadUpdateFile(context.Background())
+		if err := stream.Send(&pb.UploadUpdateFileRequest{
+			Data: &pb.UploadUpdateFileRequest_FileName{FileName: header.Filename},
+		}); err != nil {
+			http.Error(w, "Ошибка при открытии стрима", http.StatusInternalServerError)
+			slog.Error("stream send file", "error", err)
+			return
+		}
+
+		if _, err := stream.CloseAndRecv(); err != nil {
+			slog.Error("close stream", "error", err)
+		}
+
+		// Создаем файл на диске
+		dst, err := os.Create(filepath.Join("/home/dmorozov/git/sandbox/test", header.Filename))
+		if err != nil {
+			http.Error(w, "Ошибка при создании файла", http.StatusInternalServerError)
+			slog.Error("create file", "error", err)
+			return
+		}
+		defer dst.Close()
+
+		buffer := make([]byte, bufferSize)
+		for {
+			n, err := file.Read(buffer)
+			if n > 0 {
+				if _, writeErr := dst.Write(buffer[:n]); writeErr != nil {
+					http.Error(w, "Ошибка при записи файла", http.StatusInternalServerError)
+					slog.Error("write file", "error", err)
+					return
+				}
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				http.Error(w, "Ошибка при чтении файла", http.StatusInternalServerError)
+				slog.Error("read file", "error", err)
+				return
+			}
+		}
+
+		fmt.Fprintf(w, "Файл %s успешно загружен", header.Filename)
+		slog.Info("file downloaded successfully", "time", time.Since(start))
 	}
-
-	fmt.Fprintf(w, "Файл %s успешно загружен!", header.Filename)
-	slog.Info("file uploaded", "time", time.Since(start))
-
-	return nil
-}
-
-func firmwareUploadHandler(w http.ResponseWriter, r *http.Request) error {
-	//if err := s.auth.CheckAccess(r.Context(), "", UploadFirmwareAction); err != nil {
-	//	return status.Error(codes.PermissionDenied, "access deny")
-	//}
-
-	//currentUserID, err := s.auth.EndUserID(r.Context())
-	//if err != nil {
-	//	return err
-	//}
-
-	reader, err := r.MultipartReader()
-	if err != nil {
-		return err
-	}
-
-	_, err = reader.NextPart()
-	if err != nil {
-		return err
-	}
-
-	//r.Body = http.MaxBytesReader(w, r.Body, MaxFirmwareSize)
-	//if err := r.ParseMultipartForm(MaxFirmwareSize); err != nil {
-	//	return status.Errorf(codes.InvalidArgument, "firmware is too big: %v", err)
-	//}
-	//
-	//file, _, err := r.FormFile("firmware_bin")
-	//if err != nil {
-	//	return status.Errorf(codes.InvalidArgument, "failed to extract firmware file from form: %v", err)
-	//}
-	//
-	//firmware, err := s.storeFirmware(r.Context(), currentUserID, file)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//firmwareJson, err := protojson.Marshal(firmware)
-	//if err != nil {
-	//	return status.Errorf(codes.Internal, "failed to marshal firmware metadata: %v", err)
-	//}
-	//
-	//if _, err := w.Write(firmwareJson); err != nil {
-	//	return status.Errorf(codes.Internal, "failed to write firmware metadata response: %v", err)
-	//}
-
-	return nil
 }

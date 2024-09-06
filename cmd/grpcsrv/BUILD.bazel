@@ -1,20 +1,19 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_library(
-    name = "httpsrv_lib",
-    srcs = ["httpsrv.go"],
-    importpath = "github.com/mrdan4es/sandbox/cmd/httpsrv",
+    name = "grpcsrv_lib",
+    srcs = ["grpcsrv.go"],
+    importpath = "github.com/mrdan4es/sandbox/cmd/grpcsrv",
     visibility = ["//visibility:private"],
     deps = [
         "//api/fileupload/v1:fileuploadpb_go_proto",
-        "//internal/http/server",
+        "//internal/grpc/server",
         "@org_golang_google_grpc//:grpc",
-        "@org_golang_google_grpc//credentials/insecure",
     ],
 )
 
 go_binary(
-    name = "httpsrv",
-    embed = [":httpsrv_lib"],
+    name = "grpcsrv",
+    embed = [":grpcsrv_lib"],
     visibility = ["//visibility:public"],
 )

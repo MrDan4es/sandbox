@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "uploader_lib",
+    srcs = ["uploader.go"],
+    importpath = "github.com/mrdan4es/sandbox/cmd/uploader",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "uploader",
+    embed = [":uploader_lib"],
+    visibility = ["//visibility:public"],
+)

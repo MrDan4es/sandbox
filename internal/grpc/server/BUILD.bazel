@@ -3,10 +3,10 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "server",
     srcs = [
-        "filehandler.go",
+        "metrics.go",
         "server.go",
     ],
-    importpath = "github.com/mrdan4es/sandbox/internal/http/server",
+    importpath = "github.com/mrdan4es/sandbox/internal/grpc/server",
     visibility = ["//:__subpackages__"],
     deps = [
         "//api/fileupload/v1:fileuploadpb_go_proto",
@@ -14,5 +14,7 @@ go_library(
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_prometheus_client_golang//prometheus/collectors",
         "@com_github_prometheus_client_golang//prometheus/promhttp",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
     ],
 )
