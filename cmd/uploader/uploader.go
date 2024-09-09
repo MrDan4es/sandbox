@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"flag"
 	"io"
 	"log/slog"
@@ -38,8 +39,26 @@ func main() {
 		return
 	}
 
+	client := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
 	slog.Info("uploading file")
-	resp, err := http.Post("http://localhost:8000/v1/update:upload", writer.FormDataContentType(), &requestBody)
+
+	req, err := http.NewRequest("POST", "http://localhost:8080/v1/update:upload", &requestBody)
+	if err != nil {
+		slog.Error("create upload request", "error", err)
+		return
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-auth-info", "")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		slog.Error("post upload request", "error", err)
 		return
@@ -52,5 +71,10 @@ func main() {
 		return
 	}
 
-	slog.Info("successfully", "body", string(body))
+	slog.Info(
+		"successfully",
+		"body", string(body),
+		"status_code", resp.StatusCode,
+		"status", resp.Status,
+	)
 }
